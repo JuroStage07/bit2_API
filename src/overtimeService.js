@@ -2,6 +2,9 @@ const { getSqlPool } = require("./sql");
 const { db, FieldValue } = require("./firebaseAdmin");
 const { safe } = require("./auth");
 
+const VALID_ROLES = ["Coordinador", "Gerente"];
+const DEFAULT_ROLE = "Coordinador";
+
 /* ─── Helpers de cálculo (portados de las Cloud Functions) ─── */
 
 function parseScheduleRange(scheduleRange) {
@@ -331,12 +334,26 @@ async function getOvertimeCoordinators() {
 
   const snap = await db.doc("appConfig/overtimeCoordinatorEmails").get();
   const stored = snap.exists ? snap.data().coordinators || [] : [];
-  const emailByName = {};
+  const metaByName = {};
   stored.forEach((c) => {
-    if (c && c.name) emailByName[safe(c.name)] = safe(c.email);
+    if (c && c.name) {
+      metaByName[safe(c.name)] = {
+        email: safe(c.email),
+        role: VALID_ROLES.includes(c.role) ? c.role : DEFAULT_ROLE,
+        excluded: !!c.excluded,
+      };
+    }
   });
 
-  const coordinators = names.map((name) => ({ name, email: emailByName[name] || "" }));
+  const coordinators = names.map((name) => {
+    const meta = metaByName[name] || {};
+    return {
+      name,
+      email: meta.email || "",
+      role: meta.role || DEFAULT_ROLE,
+      excluded: !!meta.excluded,
+    };
+  });
   return { ok: true, coordinators };
 }
 
@@ -358,7 +375,8 @@ async function saveCoordinatorEmails({ coordinators = [], user }) {
       err.status = 400;
       throw err;
     }
-    clean.push({ name, email });
+    const role = VALID_ROLES.includes(c?.role) ? c.role : DEFAULT_ROLE;
+    clean.push({ name, email, role, excluded: !!c?.excluded });
   }
 
   await db.doc("appConfig/overtimeCoordinatorEmails").set(
