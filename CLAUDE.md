@@ -11,13 +11,20 @@ AppoloDesk frontend (hosted on Firebase Hosting).
 
 ```
 Browser (HTTPS, Firebase Hosting)
-   → Cloudflare Tunnel (https://bit2-api.ologistics.com)
+   → ngrok tunnel (https://pleading-evaporate-crawfish.ngrok-free.dev)
    → bit2-api (HTTP, 127.0.0.1:8090, this machine)
    → SQL Server Bit2 (internal network)  +  Firestore (firebase-admin)
 ```
 
-Because it lives behind a Cloudflare Tunnel on an internal box, there is no cloud
-deploy step — changes ship by restarting the local process (see PM2 in README.md).
+Because it lives behind an ngrok tunnel on an internal box, there is no cloud
+deploy step — changes ship by restarting the Windows services
+(`tools/restart-services.ps1`; see README.md).
+
+**ngrok free serves an interstitial HTML page** (status 200) to browser-UA
+requests. Every browser call must send `ngrok-skip-browser-warning: 1` or the
+frontend gets HTML where it expects JSON. The `cors()` setup already allows the
+header — nothing to change server-side. Note the README still documents Cloudflare
+Tunnel as an *alternative*: `bit2-api.ologistics.com` does not resolve today.
 
 ## Commands
 
@@ -35,13 +42,19 @@ without that connectivity.
 
 ## Configuration
 
-Two secrets must exist locally (both gitignored, never committed):
+`.env` and `service-account.json` are **committed to this private repo** by a
+deliberate team decision, so a fresh clone runs with no setup.
 
-- `.env` — copy from `.env.example`. Holds `PORT`, `CORS_ORIGINS` (comma-separated
-  allowlist, no trailing slash), and `SQL_*` credentials.
-- `service-account.json` — Firebase service account key at the repo root, or point
-  `GOOGLE_APPLICATION_CREDENTIALS` elsewhere. `src/firebaseAdmin.js` throws on
-  startup if it is missing (fail-fast).
+- `.env` — holds `PORT`, `CORS_ORIGINS` (comma-separated allowlist, no trailing
+  slash), and `SQL_*` credentials. Being versioned makes it **shared state**: do
+  not commit machine-local tweaks, they overwrite everyone else's config and can
+  break the production host.
+- `service-account.json` — Firebase service account key (project `oloos-bd`) at the
+  repo root, or point `GOOGLE_APPLICATION_CREDENTIALS` elsewhere.
+  `src/firebaseAdmin.js` throws on startup if it is missing (fail-fast).
+
+Still gitignored and fetched out-of-band: `tools/ngrok.yml` (holds the ngrok
+authtoken), `tools/ngrok.exe`, `tools/nssm.exe`, `tools/cloudflared.exe`.
 
 ## Architecture
 

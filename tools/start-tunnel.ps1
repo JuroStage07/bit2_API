@@ -1,4 +1,8 @@
 <#
+  NOTA: este script es la via ALTERNATIVA (Cloudflare) y hoy NO se usa.
+  El tunel oficial es ngrok -> usar tools\start-all.ps1 (manual) o
+  tools\install-services.ps1 (como servicio). Ver README.md.
+
   Arranca un Cloudflare Tunnel HTTPS hacia la API local (bit2-api) en el puerto 8090.
 
   Uso:
