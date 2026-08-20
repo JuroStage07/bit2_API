@@ -6,6 +6,7 @@ const cors = require("cors");
 require("./firebaseAdmin");
 
 const overtimeRoutes = require("./routes.overtime");
+const attendanceRoutes = require("./routes.attendance");
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/health", (req, res) => res.json({ ok: true, service: "bit2-api" }));
 
 app.use("/", overtimeRoutes);
+app.use("/", attendanceRoutes);
 
 const PORT = Number(process.env.PORT || 8090);
 app.listen(PORT, () => {

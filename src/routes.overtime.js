@@ -1,5 +1,6 @@
 const express = require("express");
 const { requireAuth, requireRole } = require("./auth");
+const { getSqlPool } = require("./sql");
 const {
   getOvertimeRecords,
   decideOvertimeRecord,
@@ -83,6 +84,58 @@ router.post(
       res
         .status(err.status || 500)
         .json({ ok: false, error: err.message || "No se pudo guardar la configuración." });
+    }
+  }
+);
+
+// GET /overtime/users-sync -> empleados distintos desde Bit2.
+router.get(
+  "/overtime/users-sync",
+  requireRole("administrativo", "dev"),
+  async (req, res) => {
+    try {
+      const pool = await getSqlPool();
+
+      const result = await pool.request().query(`
+        SELECT
+          sub.idEmployee,
+          sub.fullName,
+          sub.idDevice,
+          sub.nameDepartament,
+          sub.nameJobPosition,
+          sub.idGroup,
+          sub.nameGroup,
+          sub.codeGroup,
+          sub.idSchedule,
+          sub.codeSchedule,
+          s.name AS scheduleName,
+          s.InOutStr AS scheduleRange
+        FROM (
+          SELECT
+            e.idEmployee,
+            e.fullName,
+            e.idDevice,
+            e.nameDepartament,
+            e.nameJobPosition,
+            e.idGroup,
+            e.nameGroup,
+            e.codeGroup,
+            e.idSchedule,
+            e.codeSchedule,
+            ROW_NUMBER() OVER (PARTITION BY e.idEmployee ORDER BY e._date DESC) AS rn
+          FROM dbo.view_calculatedAttendance e
+          WHERE e.idEmployee IS NOT NULL
+            AND NULLIF(LTRIM(RTRIM(e.fullName)), '') IS NOT NULL
+        ) sub
+        LEFT JOIN dbo.view_schedules s ON sub.idSchedule = s.id
+        WHERE sub.rn = 1
+        ORDER BY sub.fullName
+      `);
+
+      res.json({ ok: true, employees: result.recordset });
+    } catch (err) {
+      console.error("GET /overtime/users-sync:", err);
+      res.status(500).json({ ok: false, error: "No se pudieron cargar los empleados." });
     }
   }
 );

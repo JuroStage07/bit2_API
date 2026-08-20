@@ -3,3 +3,12 @@ node_modules/
 service-account.json
 *.log
 npm-debug.log*
+
+# Binarios de túnel / servicios (se descargan aparte, no se versionan)
+tools/cloudflared.exe
+tools/ngrok.exe
+tools/nssm.exe
+tools/nssm-2.24/
+# Config de ngrok con authtoken (secreto) y logs de servicios
+tools/ngrok.yml
+tools/logs/
