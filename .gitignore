@@ -1,4 +1,7 @@
 node_modules/
+
+# Llaves locales de service account (no se versionan)
+*.local.json
 *.log
 npm-debug.log*
 

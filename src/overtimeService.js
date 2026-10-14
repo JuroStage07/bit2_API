@@ -1,4 +1,4 @@
-const { getSqlPool } = require("./sql");
+const { sql, getSqlPool } = require("./sql");
 const { db, FieldValue } = require("./firebaseAdmin");
 const { safe } = require("./auth");
 
@@ -152,14 +152,38 @@ function buildOvertimeRecord({ row, approval, startEnroll, endEnroll, overtime, 
  * Lee y arma los registros de horas extra desde SQL Bit2 + Firestore.
  * Aplica la restricción por coordinador salvo para el rol "dev".
  */
-async function getOvertimeRecords({ email, role }) {
+// "YYYY-MM-DD" con fecha real (descarta 2026-13-99) o null.
+function validIsoDate(value) {
+  const text = safe(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const d = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text ? text : null;
+}
+
+async function getOvertimeRecords({ email, role, from, to }) {
   const pool = await getSqlPool();
   const callerEmail = safe(email).toLowerCase();
   const callerRole = safe(role).toLowerCase();
   const isUnrestricted = callerRole === "dev";
 
-  const result = await pool.request().query(`
-    SELECT TOP 100
+  // Rango opcional (YYYY-MM-DD, inclusive) para consultar un corte específico.
+  // Sin rango se mantienen los 100 registros más recientes de siempre.
+  const fromDate = validIsoDate(from);
+  const toDate = validIsoDate(to);
+  const hasRange = Boolean(fromDate || toDate);
+
+  const request = pool.request();
+  if (fromDate) request.input("from", sql.VarChar(10), fromDate);
+  if (toDate) request.input("to", sql.VarChar(10), toDate);
+  const rangeFilter = [
+    fromDate ? "a._date >= CONVERT(date, @from, 23)" : null,
+    toDate ? "a._date < DATEADD(day, 1, CONVERT(date, @to, 23))" : null,
+  ]
+    .filter(Boolean)
+    .join(" AND ");
+
+  const result = await request.query(`
+    SELECT TOP ${hasRange ? 10000 : 100}
       a.id,
       a.idEmployee,
       a.fullName,
@@ -182,12 +206,15 @@ async function getOvertimeRecords({ email, role }) {
     FROM dbo.view_calculatedAttendance a
     LEFT JOIN dbo.view_schedules s
       ON a.idSchedule = s.id
-    WHERE NULLIF(LTRIM(RTRIM(a.strTotalOverTime)), '') IS NOT NULL
-       OR (
-            ((DATEPART(WEEKDAY, a._date) + @@DATEFIRST) % 7) IN (0, 1)
-            AND a.startEnroll IS NOT NULL
-            AND a.endEnroll IS NOT NULL
+    WHERE (
+            NULLIF(LTRIM(RTRIM(a.strTotalOverTime)), '') IS NOT NULL
+            OR (
+                 ((DATEPART(WEEKDAY, a._date) + @@DATEFIRST) % 7) IN (0, 1)
+                 AND a.startEnroll IS NOT NULL
+                 AND a.endEnroll IS NOT NULL
+               )
           )
+          ${rangeFilter ? `AND ${rangeFilter}` : ""}
     ORDER BY a._date DESC, a.id DESC
   `);
 

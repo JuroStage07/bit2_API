@@ -22,6 +22,8 @@ router.get(
       const data = await getOvertimeRecords({
         email: req.user.email,
         role: req.user.role,
+        from: req.query.from,
+        to: req.query.to,
       });
       res.json(data);
     } catch (err) {
