@@ -292,9 +292,32 @@ async function getOvertimeRecords({ email, role, from, to }) {
     });
   }
 
+  // Bit2 regenera los ids de asistencia cuando se recalcula, y la aprobación
+  // (guardada por attendanceId) queda suelta: el registro volvía a «pendiente».
+  // Respaldo: empleado + fecha, tomados de la copia `record` de la aprobación.
+  const dayKeyOf = (idEmployee, date) => `${safe(idEmployee)}|${safe(date).slice(0, 10)}`;
+  let approvalsByDay = null;
+  const missing = effectiveItems.some((item) => !approvalsById[String(item.row.id)]);
+  if (missing) {
+    approvalsByDay = {};
+    const all = await db.collection("overtimeApprovals").get();
+    all.forEach((snap) => {
+      const d = snap.data() || {};
+      const rec = d.record || {};
+      if (rec.idEmployee == null || !rec.date) return;
+      const key = dayKeyOf(rec.idEmployee, rec.date);
+      const prev = approvalsByDay[key];
+      const at = d.decidedAt?.toMillis?.() || 0;
+      if (!prev || at > (prev.decidedAt?.toMillis?.() || 0)) approvalsByDay[key] = d;
+    });
+  }
+
   const records = effectiveItems.map((item) => {
     const { row, isWeekend, startEnroll, endEnroll } = item;
-    const approval = approvalsById[String(row.id)];
+    const rowDate = row._date ? new Date(row._date).toISOString().slice(0, 10) : "";
+    const approval =
+      approvalsById[String(row.id)] ||
+      (approvalsByDay ? approvalsByDay[dayKeyOf(row.idEmployee, rowDate)] : undefined);
     const overtime = isWeekend
       ? calculateWeekendOvertime({ startEnroll, endEnroll })
       : calculateCompanyOvertime({ startEnroll, endEnroll, scheduleRange: row.InOutStr });
