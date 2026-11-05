@@ -34,7 +34,8 @@ npm start          # run the API (node src/index.js)
 npm run dev        # run with --watch (auto-restart on file change)
 ```
 
-There is **no test suite, linter, or build step**. To verify changes, hit
+`npm test` runs `node --test` over `test/` (pure logic of the ops3d personal sync, no
+network). There is no linter or build step. To verify other changes, hit
 `http://127.0.0.1:8090/health` (returns `{ ok: true, service: "bit2-api" }`) and
 exercise endpoints with a valid Firebase ID token. SQL access only works on a
 machine with network access to Bit2, so most logic cannot be exercised locally
@@ -79,6 +80,14 @@ Layered Express app. Request flow: `index.js` → route module → service → d
   attendance and `users-sync` routes hold their SQL inline.
 - **`src/overtimeService.js`** — all overtime domain logic, ported from the
   previous Cloud Functions implementation.
+- **`src/ops3dPersonalSync.js`** + **`src/personalLib.js`** — background loop
+  (started after `listen`) that every 60 s pushes today's BIT2 marks (CR-OLO-CLIRO)
+  to the AppOLO Supabase tables `ops3d_personal_dia` / `ops3d_personal_sync` for the
+  SRO Proceso 3D (`ops-3d-snapshot?personal=1`). Needs `OPS3D_SUPABASE_URL` and
+  `OPS3D_SUPABASE_KEY` in **`.env.local`** (gitignored — never in the shared `.env`);
+  without them it stays off. Never sends `codeEmployee` (it is the cédula). GLogs
+  datetimes are CR local time without zone: they are read as text and written with
+  `-06:00`. Contract: `SRO/docs/integracion-appolo-proceso3d.md` §1d.
 
 ### Roles and data access
 

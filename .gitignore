@@ -13,3 +13,6 @@ tools/nssm-2.24/
 # Config de ngrok con authtoken (secreto) y logs de servicios
 tools/ngrok.yml
 tools/logs/
+
+# Secretos locales de esta máquina (Supabase del Proceso 3D). .env es compartido.
+.env.local

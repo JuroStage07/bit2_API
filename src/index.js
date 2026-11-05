@@ -1,9 +1,13 @@
-require("dotenv").config();
+const path = require("path");
+// .env.local (no versionado: secretos de esta máquina) primero; .env (compartido) no lo pisa.
+require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const express = require("express");
 const cors = require("cors");
 
 // Inicializa firebase-admin al arrancar (falla rápido si falta la clave).
-require("./firebaseAdmin");
+const { db } = require("./firebaseAdmin");
+const { iniciarSyncPersonal } = require("./ops3dPersonalSync");
 
 const overtimeRoutes = require("./routes.overtime");
 const attendanceRoutes = require("./routes.attendance");
@@ -40,4 +44,6 @@ app.use("/", attendanceRoutes);
 const PORT = Number(process.env.PORT || 8090);
 app.listen(PORT, () => {
   console.log(`bit2-api escuchando en http://127.0.0.1:${PORT}`);
+  // Personal en sitio para el Proceso 3D de SRO (apagado si falta su config).
+  iniciarSyncPersonal({ db });
 });
